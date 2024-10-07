@@ -6,5 +6,4 @@ def index(request):
 urlpatterns = [
     path('', index),  
     path('polls/', include('polls.urls')),
-    
 ]
