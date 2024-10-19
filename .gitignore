@@ -9,4 +9,3 @@ __pycache__/
 
 # Ignore log files and usage information
 *.log
-usage.txt
