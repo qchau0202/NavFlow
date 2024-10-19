@@ -5,7 +5,7 @@ Smart Traffic Congestion Prediction and Navigation using Camera Data in Ho Chi M
 ```
 B1: dùng commandprompt thay vì powershell -> cd vào data_crawl_demo -> python -m venv venv
 B2: chạy môi trường ảo venv -> venv\Scripts\activate.bat
-B3: update pip -> python.exe -m pip install -- upgrade pip
+B3: update pip -> python.exe -m pip install --upgrade pip
 B4: tải packages -> pip install -r requirements.txt 
 B5: xóa dataset cũ (nếu có)
 B6: vào file data_crawl.py, kiểm tra số lượng ảnh muốn fetch cho mỗi cam ở dòng 91
