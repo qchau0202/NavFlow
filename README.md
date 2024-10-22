@@ -1,7 +1,7 @@
 # NavFlow
 Smart Traffic Congestion Prediction and Navigation using Camera Data in Ho Chi Minh City
 
-## Sử dụng data crawl lấy ảnh
+## Hướng dẫn sử dụng data crawl lấy ảnh
 ```
 B1: dùng commandprompt thay vì powershell -> cd vào data_crawl_demo -> tạo môi trường ảo: python -m venv venv
 B2: chạy môi trường ảo venv -> venv\Scripts\activate.bat
