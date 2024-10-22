@@ -12,4 +12,5 @@ B6: vào file data_crawl.py, kiểm tra số lượng ảnh muốn fetch cho m�
     fetch bao nhiêu thì điền vô bấy nhiêu, mặc định đang để là 5
 B7: chạy file -> python data_crawl.py
 B8: lặp lại bước 4 nếu muốn lấy dataset từ đầu
+B9: sau khi lấy data set xong -> deactivate ( thoát môi trường ảo )
 ```
