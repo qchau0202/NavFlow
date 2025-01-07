@@ -8,7 +8,7 @@ from typing import Optional, Dict
 from urllib.parse import quote
 
 class CameraCapture:
-    def __init__(self, base_dir: str = "dataset/images"):  # Changed back to dataset/images
+    def __init__(self, base_dir: str = "dataset/images"):
         self.base_dir = base_dir
         self.session = requests.Session()
         self.session.headers.update({
@@ -23,7 +23,6 @@ class CameraCapture:
         })
 
     def create_folder_structure(self, camera_name: str) -> str:
-        # Create camera-specific directory under existing base_dir
         camera_dir = os.path.join(self.base_dir, camera_name)
         if not os.path.exists(camera_dir):
             os.makedirs(camera_dir)
@@ -91,7 +90,6 @@ class CameraCapture:
         return False
 
     def process_camera(self, camera_name: str, api_url: str, num_images: int, capture_interval: int = 15):
-        # Create folder structure for this camera
         camera_dir = self.create_folder_structure(camera_name)
         print(f"\nStarting capture for: {camera_name}")
         next_image_index = self.get_next_image_index(camera_dir)
