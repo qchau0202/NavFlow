@@ -1,109 +1,175 @@
-import requests, os, time, re, concurrent.futures
+import requests
+import os
+import time
+import re
+import concurrent.futures
 from datetime import datetime
-from camera_api import CAMERA_URLS
+from typing import Optional, Dict
+from urllib.parse import quote
 
-# Lấy ảnh từ API
-def fetch_camera_url(api_url, timeout=10):
-    try:
-        response = requests.get(api_url, timeout=timeout)  # Gửi req
-        if response.status_code == 200:  # Kiểm tra req
-            # Lấy camera id
-            cam_id_match = re.search(r'"CamId":"(.*?)"', response.text)
+class CameraCapture:
+    def __init__(self, base_dir: str = "dataset/images"):  # Changed back to dataset/images
+        self.base_dir = base_dir
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+            'Referer': 'http://giaothong.hochiminhcity.gov.vn/',
+        })
+
+    def create_folder_structure(self, camera_name: str) -> str:
+        # Create camera-specific directory under existing base_dir
+        camera_dir = os.path.join(self.base_dir, camera_name)
+        if not os.path.exists(camera_dir):
+            os.makedirs(camera_dir)
+            print(f"Created camera directory: {camera_dir}")
+        
+        return camera_dir
+
+    def fetch_camera_url(self, api_url: str, timeout: int = 1) -> Optional[str]:
+        try:
+            cam_id_match = re.search(r'camId=([^&]+)', api_url)
             if cam_id_match:
-                cam_id = cam_id_match.group(1) 
-                # Lấy url theo từng cam
-                return f"http://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id={cam_id}"
-    except requests.RequestException as error:
-        print(f"Fetching camera failed: {error}")  
-    return None
+                cam_id = cam_id_match.group(1)
+                image_url = f"http://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id={cam_id}"
+                
+                img_response = self.session.get(image_url, timeout=timeout)
+                if img_response.status_code == 200:
+                    content_type = img_response.headers.get('content-type', '')
+                    if content_type.startswith('image/'):
+                        return image_url
+                    print(f"Invalid content type received: {content_type}")
+                else:
+                    print(f"Image URL returned status code: {img_response.status_code}")
+            else:
+                print("Failed to extract camera ID from URL")
+                
+        except requests.RequestException as error:
+            print(f"Error accessing image URL: {error}")
+        except Exception as error:
+            print(f"Unexpected error: {error}")
+        return None
 
-# Lưu ảnh theo path
-def save_image(image_url, image_path, timeout=10):
-    try:
-        img_response = requests.get(image_url, timeout=timeout)  # Req để fetch ảnh
-        if img_response.status_code == 200:  # Kiểm tra req
-            with open(image_path, 'wb') as f:  # Mở file
-                f.write(img_response.content)  # Viết file
-                print(f"Saved: {image_path}")
-            return True 
-    except requests.RequestException as error:
-        print(f"Error saving image: {error}") 
-    return False
-
-# Kiểm tra sự tồn tại của dir
-def create_directory(directory):
-    if not os.path.exists(directory):  
-        os.makedirs(directory)  # Tạo dir mới
-        print(f"Created directory: {directory}") 
-
-# Lấy index của ảnh hiện tại
-def get_next_image_index(camera_dir):
-    # Kiểm tra có folder hay không
-    if not os.path.exists(camera_dir):
-        return 0
-    # List ra các ảnh đã có
-    existing_images = [f for f in os.listdir(camera_dir) if f.endswith('.jpg')]  # List all existing image files
-    # Kiểm tra nếu không có ảnh
-    if not existing_images:  
-        return 0
-    
-    # Lấy số từ tên file (VD: 'image_1.jpg' -> 1)
-    image_numbers = [int(re.search(r'image_(\d+)\.jpg', img).group(1)) for img in existing_images]
-    return max(image_numbers) + 1  # Trả về index tiếp theo để lưu ảnh
-
-# Chạy từng camera + lấy ảnh
-def process_camera(camera_name, api_url, num_images, capture_interval=15):
-    base_dir = "dataset/images"  # Folder lưu ảnh
-    camera_dir = os.path.join(base_dir, f"{camera_name}_Images")  # Tạo folder to từng camera
-    create_directory(camera_dir)  # Tạo folder nếu chưa có
-
-    print(f"\nStarting fecthing for: {camera_name}")
-
-    next_image_index = get_next_image_index(camera_dir)  # Lấy index ảnh tiếp theo
-    images_captured = 0  # Biến đếm ảnh
-    
-    # Loop theo số lượng ảnh cần lấy ( biến num_images )
-    while images_captured < num_images:
-        camera_feed_url = fetch_camera_url(api_url)  # Lấy URL ảnh của camera
-        if camera_feed_url:  # Kiểm tra đã lấy được chưa
-            image_path = os.path.join(camera_dir, f"image_{next_image_index}.jpg")  # Tạo file ảnh + số ảnh
-            if save_image(camera_feed_url, image_path):  
-                images_captured += 1  # Tăng counter cho ảnh tiếp theo
-                next_image_index += 1  # Tăng index qua ảnh tiếp theo
-                time.sleep(capture_interval) # API reset mỗi 15s nên set interval = 15s, chỉnh lại cũng được
-        else:
-            print(f"Fetching URL failed for {camera_name}")  # Kiểm tra lỗi fetching của camera
-            time.sleep(5) 
-    print(f"Fecthing succeed: {num_images} images for {camera_name}")
-
-def main():
-    create_directory("dataset/images")
-
-    max_cameras = len(CAMERA_URLS) # Tổng số camera 
-    print(f"Starting capture with {max_cameras} concurrent cameras")  # In ra số lượng camera hiện có
-
-    start_time = datetime.now()  # Ghi lại thời gian chạy (không có cũng được)
-
-    # Dùng ThreadPoolExecutor để các camera chạy đồng thời (concurrently)
-    with concurrent.futures.ThreadPoolExecutor(max_workers = max_cameras) as execute:
-        latest = {
-            #! Điền tham số cho hàm process_camera, lưu ý số lượng ảnh num_images
-            execute.submit(process_camera, camera_name, api_url, num_images=5): camera_name
-            for camera_name, api_url in CAMERA_URLS.items()
-        }
-        # Loop mỗi khi 1 camera thành công
-        for get_cam in concurrent.futures.as_completed(latest):
-            camera_name = latest[get_cam]  # Lấy tên camera được process gần nhất
+    def save_image(self, image_url: str, image_path: str, timeout: int = 1) -> bool:
+        max_retries = 5
+        for attempt in range(max_retries):
             try:
-                get_cam.result()
-                print(f"Processing completed: {camera_name}")  
-            except Exception as error:
-                print(f"Processing failed: {camera_name}: {error}") 
+                if attempt > 0:
+                    time.sleep(2)
 
-    end_time = datetime.now()  # Thời gian hoàn thành
-    duration = end_time - start_time 
-    print(f"\nTotal time fetching: {duration}")
-    print("Successfully!")
+                img_response = self.session.get(
+                    image_url, 
+                    timeout=timeout,
+                    stream=True
+                )
+                img_response.raise_for_status()
+                
+                content_type = img_response.headers.get('content-type', '')
+                if not content_type.startswith('image/'):
+                    print(f"Warning: Unexpected content type: {content_type}")
+                    continue
+
+                with open(image_path, 'wb') as f:
+                    for chunk in img_response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                
+                if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
+                    print(f"Successfully saved: {image_path}")
+                    return True
+                else:
+                    print(f"File saved but may be empty: {image_path}")
+                    
+            except requests.RequestException as error:
+                print(f"Attempt {attempt + 1}/{max_retries} failed: {error}")
+                
+        return False
+
+    def process_camera(self, camera_name: str, api_url: str, num_images: int, capture_interval: int = 15):
+        # Create folder structure for this camera
+        camera_dir = self.create_folder_structure(camera_name)
+        print(f"\nStarting capture for: {camera_name}")
+        next_image_index = self.get_next_image_index(camera_dir)
+        images_captured = 0
+        consecutive_failures = 0
+        max_failures = 5
+        while images_captured < num_images and consecutive_failures < max_failures:
+            try:
+                actual_interval = capture_interval + (time.time() % 2)                
+                camera_feed_url = self.fetch_camera_url(api_url)
+                if camera_feed_url:
+                    image_path = os.path.join(camera_dir, f"image_{next_image_index}.jpg")
+                    if self.save_image(camera_feed_url, image_path):
+                        images_captured += 1
+                        next_image_index += 1
+                        consecutive_failures = 0
+                        time.sleep(actual_interval)
+                    else:
+                        consecutive_failures += 1
+                        time.sleep(5)
+                else:
+                    consecutive_failures += 1
+                    time.sleep(5)
+            except Exception as error:
+                consecutive_failures += 1
+                print(f"Error processing {camera_name}: {error}")
+                time.sleep(5)
+
+        if consecutive_failures >= max_failures:
+            print(f"Stopped capturing {camera_name} due to too many failures")
+        else:
+            print(f"Successfully captured {images_captured} images for {camera_name}")
+
+    def get_next_image_index(self, camera_dir: str) -> int:
+        try:
+            existing_images = [f for f in os.listdir(camera_dir) if f.endswith('.jpg')]
+            if not existing_images:
+                return 0   
+            image_numbers = []
+            for img in existing_images:
+                match = re.search(r'image_(\d+)\.jpg', img)
+                if match:
+                    image_numbers.append(int(match.group(1)))
+            return max(image_numbers + [-1]) + 1
+        except Exception as error:
+            print(f"Error getting next image index: {error}")
+            return 0
+
+def main(camera_urls: Dict[str, str], num_images: int = 2):
+    # Check if base directory exists, create only if it doesn't
+    base_dir = "dataset/images"
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir)
+        print(f"Created base directory: {base_dir}")
+    else:
+        print(f"Using existing base directory: {base_dir}")
+    capture = CameraCapture(base_dir)
+    print(f"Starting concurrent capture for {len(camera_urls)} cameras")
+    start_time = datetime.now()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(camera_urls)) as executor:
+        # Create a map of futures to camera names
+        future_to_camera = {
+            executor.submit(capture.process_camera, camera_name, api_url, num_images): camera_name 
+            for camera_name, api_url in camera_urls.items()
+        }
+        # Process completed futures as they finish
+        for future in concurrent.futures.as_completed(future_to_camera):
+            camera_name = future_to_camera[future]
+            try:
+                future.result()  # Get the result or raise any exceptions
+                print(f"Completed processing: {camera_name}")
+            except Exception as error:
+                print(f"Failed processing {camera_name}: {error}")
+    duration = datetime.now() - start_time
+    print(f"\nTotal capture time: {duration}")
+    print("Capture completed")
 
 if __name__ == "__main__":
-    main()
+    # Example camera URLs
+    from camera_api import CAMERA_URLS
+    main(CAMERA_URLS, num_images=1)
