@@ -1,0 +1,12 @@
+django
+djangorestframework
+markdown
+django-filter
+django-allauth
+django-cors-headers
+python-dotenv
+Pillow
+django-debug-toolbar
+flake8
+black
+pytest-django
