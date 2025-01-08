@@ -1,11 +1,49 @@
-# Ignore virtual environment folder
-venv/
-
-# Ignore cache files
+# Backend
+/backend/venv/
+/data_crawl_demo/venv/
 __pycache__/
-
-# Ignore Python bytecode files
 *.pyc
-
-# Ignore log files and usage information
+*.pyo
+*.pyd
+.Python
 *.log
+.env
+.env.local
+db.sqlite3
+
+# Frontend
+/frontend/node_modules/
+/frontend/.npm
+/frontend/build
+/frontend/dist
+/frontend/.env
+/frontend/.env.local
+.DS_Store
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Data and Models
+*.weights
+*.pt
+*.pth
+*.h5
+/data/
+/datasets/
+/models/
+/checkpoints/
+*.mp4
+*.avi
+*.mov
