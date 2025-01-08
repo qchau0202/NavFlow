@@ -1,0 +1,17 @@
+django
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+django-filter
+django-allauth
+django-debug-toolbar
+python-dotenv
+Pillow
+flake8
+black
+pytest-django
+asgiref
+PyJWT
+pytz
+psycopg2-binary
+markdown
