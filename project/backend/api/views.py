@@ -34,12 +34,10 @@ from .models import Note
 #         user = self.request.user 
 #         return Note.objects.filter(author=user) 
 
-# class CreateUserView(generics.CreateAPIView):
-#     queryset = User.objects.all()
-#     serializer_class = UserSerializer
-#     permission_classes = [AllowAny]
-
 # These code above are for referencing only. They are not used in the project.
-
+class CreateUserView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [AllowAny]
 # Write your code here
     
