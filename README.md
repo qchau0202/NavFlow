@@ -1,16 +1,45 @@
 # NavFlow
-Smart Traffic Congestion Prediction and Navigation using Camera Data in Ho Chi Minh City
+## Smart Traffic Congestion Prediction and Navigation using Camera Data in Ho Chi Minh City
 
-## Hướng dẫn sử dụng data crawl lấy ảnh
+### Data Crawling for Dataset Collection
+To collect images for training the dataset, follow these steps:
+
 ```
-B1: dùng commandprompt thay vì powershell -> cd vào data_crawl_demo -> tạo môi trường ảo (nếu chưa tạo): python -m venv venv
-B2: chạy môi trường ảo venv -> venv\Scripts\activate.bat
-B3: update pip -> python.exe -m pip install --upgrade pip
-B4: tải packages (nếu chưa tải) -> pip install -r requirements.txt 
-B5: xóa dataset cũ (nếu có)
-B6: vào file data_crawl.py, kiểm tra số lượng ảnh muốn fetch cho mỗi cam ở main
-    fetch bao nhiêu thì điền vô bấy nhiêu, mặc định đang để là 1
-B7: chạy file -> python data_crawl.py
-B8: lặp lại bước 6 nếu muốn lấy dataset từ đầu
-B9: sau khi lấy data set xong -> venv\Scripts\deactivate.bat ( thoát môi trường ảo )
+Step 1: Navigate to the `data_crawl_demo` folder.
+Step 2: Activate the virtual environment:
+        venv/Scripts/activate.bat
+Step 3: Run the data crawling script:
+        python data_crawl_demo.py
+Step 4: Images will be organized by camera and stored in the `dataset_raw` folder.
 ```
+
+### Running the Trained Model
+To run the pre-trained model for vehicle detection and congestion prediction:
+
+```
+Step 1: Navigate to the `data_crawl_demo` folder.
+Step 2: Activate the virtual environment:
+        venv/Scripts/activate.bat
+Step 3: Open `yolo_detection.py` and verify the number of images to be processed (default is 2).
+Step 4: Run the main script:
+        python yolo_detection.py
+Step 5: Detection results will be displayed in the terminal.
+        Processed images with detected vehicles will be saved in the `detections` folder.
+```
+
+This project aims to enhance traffic navigation by utilizing camera data to predict congestion and suggest alternative routes.
+
+### Libraries used in this project
+#### Core Libraries:
+numpy, scipy, pandas, matplotlib, seaborn
+requests, urllib3, certifi
+#### Machine Learning & Deep Learning:
+torch, torchvision, torchaudio, ultralytics, ultralytics-thop
+#### Computer Vision:
+opencv-python, pillow
+#### Web Scraping & Parsing:
+beautifulsoup4, soupsieve, lxml, Jinja2, MarkupSafe
+#### Utilities & Others:
+tqdm, psutil, py-cpuinfo, filelock, python-dateutil, pytz, tzdata
+#### Testing & Packaging:
+pytest, iniconfig, pluggy, setuptools, packaging
