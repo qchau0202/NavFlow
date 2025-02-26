@@ -1,36 +1,119 @@
-import torch
+import os
+import time
+import re
+import requests
 import cv2
-from PIL import Image
 import numpy as np
+import concurrent.futures
+from datetime import datetime
+from queue import Queue
+from threading import Thread
+from typing import Optional, Dict
+from ultralytics import YOLO
+from camera_api import CAMERA_URLS
 
-# Load the YOLOv5 model
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
 
-# Define the classes we are interested in
-classes_of_interest = ['car', 'motorbike']
+# Load model YOLOv8 đã train
+print("Starting program...")
+MODEL_PATH = r"C:\Users\MSII\Desktop\NCKH\NavFlow\runs\detect\train\weights\best.pt"
+print(f"Loading model from {MODEL_PATH}...")
+model = YOLO(MODEL_PATH)
+print("Model loaded successfully!")
+print("Starting detection...")
 
-# Load an image
-img_path = r'D:\Downloads\Projects\Test\NavFlow\data_crawl_demo\dataset\images\CMT8_1_Images\image_0.jpg'
-img = Image.open(img_path)
 
-# Perform inference
-results = model(img)
+class CameraCapture:
+    def __init__(self, frame_queue: Queue):
+        self.session = requests.Session()
+        self.frame_queue = frame_queue  # Hàng đợi để gửi ảnh cho YOLO
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'image/avif,image/webp,image/apng,*/*',
+            'Referer': 'http://giaothong.hochiminhcity.gov.vn/',
+        })
 
-# Filter results for cars and motorbikes
-filtered_results = results.pandas().xyxy[0]
-filtered_results = filtered_results[filtered_results['name'].isin(classes_of_interest)]
+    def create_folder_structure(self, camera_name: str) -> str:
+        camera_dir = os.path.join("detections", camera_name)
+        os.makedirs(camera_dir, exist_ok=True)
+        return camera_dir
 
-# Convert the image to OpenCV format
-img_cv2 = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    def fetch_camera_image(self, api_url: str, timeout: int = 1) -> Optional[np.ndarray]:
+        try:
+            cam_id_match = re.search(r'camId=([^&]+)', api_url)
+            if cam_id_match:
+                cam_id = cam_id_match.group(1)
+                image_url = f"http://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id={cam_id}"
+                img_response = self.session.get(image_url, timeout=timeout, stream=True)
+                
+                if img_response.status_code == 200 and img_response.headers.get('content-type', '').startswith('image/'):
+                    img_array = np.asarray(bytearray(img_response.content), dtype=np.uint8)
+                    frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                    if frame is None:
+                        print("Failed to decode image!")
+                    return frame    
+                
+        except requests.RequestException as error:
+            print(f"Error accessing image URL: {error}")
+        return None
 
-# Draw bounding boxes and labels on the image
-for _, row in filtered_results.iterrows():
-    x1, y1, x2, y2, conf, cls = int(row['xmin']), int(row['ymin']), int(row['xmax']), int(row['ymax']), row['confidence'], row['name']
-    label = f"{cls} {conf:.2f}"
-    cv2.rectangle(img_cv2, (x1, y1), (x2, y2), (0, 255, 0), 2)
-    cv2.putText(img_cv2, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+    def process_camera(self, camera_name: str, api_url: str, num_images: int, capture_interval: int = 15):
+        print(f"\nStarting capture for: {camera_name}")
+        images_captured = 0
+        while images_captured < num_images:
+            frame = self.fetch_camera_image(api_url)
+            if frame is not None:
+                # Đưa ảnh vào hàng đợi để YOLO xử lý
+                print(f"Captured image for {camera_name}, sending to queue...")
+                self.frame_queue.put((camera_name, frame))
+                print(f"Image sent to YOLO for processing: {camera_name}")
+                images_captured += 1
+            time.sleep(capture_interval)
 
-# Display the image
-cv2.imshow('Image', img_cv2)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+def detect_objects(frame_queue: Queue):
+    while True:
+        print("Waiting for frame...")
+        camera_name, frame = frame_queue.get()
+        
+        # Chạy YOLO detect
+        results = model(frame)
+
+        # Lưu ảnh kết quả vào detections/tênCamera/
+        save_detection_results(camera_name, frame, results)
+
+def save_detection_results(camera_name: str, frame: np.ndarray, results):
+    output_dir = os.path.join("detections", camera_name)
+    os.makedirs(output_dir, exist_ok=True)
+
+    for r in results:
+        for box in r.boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            confidence = box.conf[0].item()
+            label = model.names[int(box.cls[0])]
+
+            # Vẽ bounding box + label
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(frame, f"{label} {confidence:.2f}", 
+                        (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.5, (0, 255, 0), 2)
+
+    # Lưu ảnh kết quả vào thư mục detections/tênCamera/
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = os.path.join(output_dir, f"{timestamp}.jpg")
+    cv2.imwrite(output_path, frame)
+    print(f"Detection result saved: {output_path}")
+
+def main(camera_urls: Dict[str, str], num_images: int = 5):
+    frame_queue = Queue(maxsize=10)
+    capture = CameraCapture(frame_queue=frame_queue)
+
+    # Chạy YOLO detection song song
+    yolo_thread = Thread(target=detect_objects, args=(frame_queue,), daemon=True)
+    yolo_thread.start()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(camera_urls)) as executor:
+        for camera_name, api_url in camera_urls.items():
+            executor.submit(capture.process_camera, camera_name, api_url, num_images)
+            
+if __name__ == "__main__":
+    main(CAMERA_URLS, num_images=10)
+
