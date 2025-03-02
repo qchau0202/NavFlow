@@ -1,12 +1,9 @@
-import { useState, useEffect } from "react";
-import api from "../api";
-import "../styles/Home.css";
+import Header from "../components/header/Header";
 const Home = () => {
   return (
-    <div>
-      <h1>Home Page</h1>
-      <p>Welcome to the home page</p>
-    </div>
+    <>
+     <Header/>
+    </>
   );
 };
 
